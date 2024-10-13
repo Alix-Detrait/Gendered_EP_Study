@@ -1,0 +1,72 @@
+#### Multinomial logit regression 
+#install.packages("mlogit", dependencies=TRUE) # Only need to do this once
+#install.packages("nnet", dependencies=TRUE) # Only need to do this once
+library(mlogit)
+library(nnet)
+library(readr)
+
+
+
+
+
+
+meps_survey_allwaves_q2_7 <- read_csv("01_data/data_input/meps_survey_allwaves.csv") 
+
+
+#######
+df <- meps_survey_allwaves_q2_7 %>% 
+  select(b_3, q2_7_1, q2_7_2,q2_7_3,q2_7_4,q2_7_5,q2_7_6,q2_7_7,q2_7_9,q1_7) %>%
+  rename("legislature" = "b_3",
+         "gender" = "q1_7") %>% 
+  mutate(legislature = case_when(legislature=="1" ~ "5th legislature",
+                                 legislature=="2" ~ "6th legislature",
+                                 legislature=="3" ~ "7th legislature",
+                                 legislature=="4" ~ "8th legislature"),
+         across(starts_with("q2"), as.numeric),
+         gender = as.numeric(gender),
+         gender = if_else(gender==1, "male", "female")) %>%
+  filter(!if_all(starts_with("q2"), ~ is.na(.))) %>%
+  mutate(across(starts_with("q2"), ~ replace_na(.,0))) %>%
+  mutate(sum_choice = rowSums(select(.,starts_with("q2")))
+  ) %>%
+  filter(sum_choice<2) %>% select(-sum_choice) %>% 
+  mutate(reply = case_when(q2_7_1 == 1 ~ 1 ,
+                           q2_7_2 == 1 ~ 2 ,
+                           q2_7_3 == 1 ~ 3,
+                           q2_7_4 == 1 ~ 4,
+                           q2_7_5 == 1 ~ 5, 
+                           q2_7_6 == 1 ~ 6,
+                           q2_7_7 == 1 ~ 7,
+                           q2_7_9 == 1 ~ 9)) %>%
+  select(-starts_with("q2")) %>%
+  mutate(gender = if_else(gender=="female", 1,0)) %>%
+  rename("female"="gender")
+
+
+
+
+
+
+####
+reg_female <- multinom(reply ~ female, data = df)
+summary(reg_female)
+
+
+
+
+# library(kableExtra)
+# library(broom)
+# tidy(reg_female, conf.int = TRUE) %>% 
+#   kable() %>% 
+#   kable_styling("basic", full_width = FALSE)
+
+
+
+
+df_logit <- mlogit.data(df %>% select(-legislature),shape="wide",choice="reply")
+
+
+reg_female1 <- mlogit(reply ~ 0 | female, data = df_logit)
+summary(reg_female1)
+
+
